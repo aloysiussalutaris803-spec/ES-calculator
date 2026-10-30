@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ES-99 Advanced Scientific Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjs@12.4.1/lib/browser/math.js"></script>
+<style>
+:root{
+  --bg:#05080f; --bg-glow:#12233d;
+  --panel:#0b1220; --panel-2:#0f1a2b;
+  --line:#1b2941; --line-2:#24354f;
+  --text:#dce7f5; --muted:#7d90a8;
+  --accent:#3d9bff; --accent-2:#33e0c4;
+  --danger:#ff5c6c; --warn:#ffb545;
+  --lcd-bg:#061614; --lcd-text:#7bf0c8; --lcd-dim:#2f7a63;
+  --key:#16233a; --key-hi:#1e3050; --key-hover:#24395c;
+  --key-num:#1b2b45; --key-num-hi:#22375a;
+  --shadow:0 18px 45px rgba(0,0,0,.55);
+}
+[data-theme="light"]{
+  --bg:#e9eff7; --bg-glow:#cfe0f2;
+  --panel:#ffffff; --panel-2:#f4f8fd;
+  --line:#d3dfee; --line-2:#bccde0;
+  --text:#0f1b2b; --muted:#5c7089;
+  --accent:#0b6bd6; --accent-2:#0f9e8a;
+  --lcd-bg:#eaf7ee; --lcd-text:#0b6b4f; --lcd-dim:#8fb8a6;
+  --key:#eef3fa; --key-hi:#e2ebf7; --key-hover:#d5e2f2;
+  --key-num:#f7fafd; --key-num-hi:#eaf1f9;
+  --shadow:0 18px 40px rgba(20,50,90,.16);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:radial-gradient(1200px 620px at 50% -20%, var(--bg-glow) 0%, transparent 65%), var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  padding:16px 16px 40px;
+  transition:background .3s, color .3s;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto}
+
+/* ---------- header ---------- */
+header.top{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin-bottom:14px;
+}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{
+  width:44px;height:44px;border-radius:12px;flex:0 0 auto;
+  background:linear-gradient(145deg,var(--accent),#1b6fd6);
+  display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;
+  box-shadow:0 8px 22px rgba(61,155,255,.35);letter-spacing:-.5px;
+}
+.brand h1{font-size:17px;margin:0;letter-spacing:-.02em}
+.brand p{margin:2px 0 0;font-size:11.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{
+  background:var(--panel);border:1px solid var(--line);color:var(--text);
+  border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:.15s;font-family:inherit;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#04101f}
+
+/* ---------- mode bar ---------- */
+.modes{
+  display:flex;gap:6px;overflow-x:auto;padding:6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  margin-bottom:16px;scrollbar-width:thin;
+}
+.modes::-webkit-scrollbar{height:5px}
+.modes::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:5px}
+.modes button{
+  flex:0 0 auto;background:transparent;border:0;color:var(--muted);
+  padding:9px 15px;border-radius:9px;font-size:12.5px;font-weight:700;
+  letter-spacing:.03em;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap;
+}
+.modes button:hover{color:var(--text);background:var(--key)}
+.modes button.active{background:var(--accent);color:#04101f}
+
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+
+.card{
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border:1px solid var(--line);border-radius:18px;padding:16px;
+  box-shadow:var(--shadow);
+}
+
+/* ---------- LCD ---------- */
+.lcd{
+  background:var(--lcd-bg);border:1px solid var(--line-2);border-radius:14px;
+  padding:12px 15px 10px;margin-bottom:10px;
+  box-shadow:inset 0 0 46px rgba(0,255,200,.07), inset 0 2px 0 rgba(255,255,255,.03);
+  font-family:"SF Mono",ui-monospace,"JetBrains Mono","Fira Code",Consolas,monospace;
+}
+.lcd-hist{
+  font-size:11.5px;color:var(--lcd-dim);min-height:15px;text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9;
+}
+.lcd-expr{
+  font-size:17px;color:var(--lcd-text);min-height:26px;text-align:right;
+  white-space:nowrap;overflow-x:auto;padding:4px 0 2px;letter-spacing:.03em;
+  scrollbar-width:none;
+}
+.lcd-expr::-webkit-scrollbar{display:none}
+.lcd-res{
+  font-size:clamp(24px,5vw,34px);font-weight:700;color:var(--lcd-text);
+  text-align:right;min-height:44px;line-height:1.25;word-break:break-all;
+  text-shadow:0 0 18px rgba(123,240,200,.28);
+}
+.lcd-res.err{color:var(--danger);font-size:15px;font-weight:600;text-shadow:none;word-break:break-word;line-height:1.4}
+.lcd-alt{
+  font-size:12px;color:var(--lcd-dim);text-align:right;min-height:16px;
+  font-family:"SF Mono",ui-monospace,monospace;margin-top:2px;
+}
+.caret{
+  display:inline-block;width:2px;height:1.05em;background:var(--lcd-text);
+  vertical-align:-.16em;animation:blink 1.05s steps(1) infinite;margin:0 -1px;
+}
+@keyframes blink{50%{opacity:0}}
+
+.indicators{
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;margin-bottom:12px;
+}
+.ind{
+  padding:3px 9px;border-radius:6px;background:var(--key);color:var(--muted);
+  border:1px solid var(--line);transition:.15s;
+}
+.ind.on{background:var(--accent-2);color:#04140f;border-color:var(--accent-2)}
+.ind.warn{background:var(--warn);color:#241600;border-color:var(--warn)}
+.ind.spacer{flex:1;background:transparent;border:0}
+.copy-btn{
+  padding:3px 10px;border-radius:6px;background:var(--key);border:1px solid var(--line);
+  color:var(--muted);font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  letter-spacing:.06em;transition:.15s;
+}
+.copy-btn:hover{color:var(--accent-2);border-color:var(--accent-2)}
+
+/* ---------- keypad ---------- */
+.keypad{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.key{
+  position:relative;border:1px solid var(--line);border-radius:11px;
+  background:linear-gradient(180deg,var(--key-hi),var(--key));
+  color:var(--text);font-size:15px;font-weight:600;font-family:inherit;
+  padding:14px 2px;cursor:pointer;user-select:none;
+  transition:transform .07s,background .15s,box-shadow .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;line-height:1;
+}
+.key:hover{background:var(--key-hover)}
+.key:active{transform:translateY(1px) scale(.975)}
+.key.num{background:linear-gradient(180deg,var(--key-num-hi),var(--key-num));font-size:16px}
+.key.op{background:linear-gradient(180deg,#2a4a7a,#1d3355);color:#cfe4ff}
+[data-theme="light"] .key.op{background:linear-gradient(180deg,#dbeafe,#c7defc);color:#0b3a75}
+.key.eq{background:linear-gradient(180deg,#28c98d,#159b6a);color:#04150e;border-color:#1db37c;font-size:17px}
+.key.eq:hover{background:linear-gradient(180deg,#33e0a0,#18ab77)}
+.key.fn{background:linear-gradient(180deg,#1d293e,#141d2e);font-size:12.5px;color:#9db4d0;letter-spacing:.04em}
+[data-theme="light"] .key.fn{background:linear-gradient(180deg,#e8eff9,#dde8f5);color:#3c5471}
+.key.red{color:#ff8a95}
+.key.active{box-shadow:0 0 0 2px var(--accent-2) inset;color:var(--accent-2)}
+.key .sup{
+  position:absolute;top:3px;right:5px;font-size:9px;color:var(--warn);
+  font-weight:700;opacity:.85;
+}
+.key .alpha{
+  position:absolute;top:3px;left:5px;font-size:9px;color:#e0a3ff;font-weight:700;opacity:.8;
+}
+.key.span2{grid-column:span 2}
+
+/* ---------- extra functions ---------- */
+details.more{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+details.more summary{
+  cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.08em;
+  color:var(--muted);text-transform:uppercase;list-style:none;padding:4px 0;
+  display:flex;align-items:center;gap:7px;user-select:none;
+}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:"▸";transition:.2s;display:inline-block}
+details.more[open] summary::before{transform:rotate(90deg)}
+details.more summary:hover{color:var(--accent)}
+.extras{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:10px}
+.extras button{
+  border:1px solid var(--line);border-radius:9px;background:var(--key);
+  color:var(--text);font-size:12px;font-family:inherit;font-weight:600;
+  padding:9px 3px;cursor:pointer;transition:.15s;
+}
+.extras button:hover{background:var(--key-hover);color:var(--accent-2);border-color:var(--accent-2)}
+.extras button:active{transform:scale(.96)}
+
+/* ---------- sidebar ---------- */
+.sidebar{position:sticky;top:16px}
+@media(max-width:900px){.sidebar{position:static}}
+.side-head{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;
+}
+.side-head button{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:6px;
+  cursor:pointer;font-family:inherit;letter-spacing:.05em;transition:.15s;
+}
+.side-head button:hover{color:var(--danger);border-color:var(--danger)}
+.history{max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.history::-webkit-scrollbar{width:5px}
+.history::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:5px}
+.hitem{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:9px;
+  padding:8px 10px;cursor:pointer;transition:.15s;
+}
+.hitem:hover{border-color:var(--accent);background:var(--key)}
+.hitem .he{
+  font-size:11.5px;color:var(--muted);font-family:ui-monospace,monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.hitem .hr{
+  font-size:14px;font-weight:700;color:var(--accent-2);
+  font-family:ui-monospace,monospace;text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.empty{font-size:12px;color:var(--muted);text-align:center;padding:22px 0;font-style:italic}
+
+/* ---------- mode panels ---------- */
+.mode-panel h2{
+  font-size:15px;margin:0 0 4px;letter-spacing:-.01em;
+}
+.mode-panel .desc{font-size:12px;color:var(--muted);margin:0 0 16px;line-height:1.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}}
+.fld{margin-bottom:11px}
+.fld label{
+  display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+}
+input[type=text],input[type=number],textarea,select{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:9px;color:var(--text);padding:10px 11px;font-size:13.5px;
+  font-family:inherit;outline:none;transition:.15s;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(61,155,255,.12)}
+textarea{
+  font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px;
+  resize:vertical;min-height:70px;line-height:1.5;
+}
+select{cursor:pointer}
+.btn{
+  background:linear-gradient(180deg,var(--accent),#1f77d6);color:#fff;border:0;
+  border-radius:9px;padding:10px 18px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:.15s;letter-spacing:.02em;
+}
+.btn:hover{filter:brightness(1.12)}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:var(--key);color:var(--text);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--key-hover);color:var(--accent)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+
+.out{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:11px;
+  padding:13px 14px;font-family:ui-monospace,"SF Mono",Consolas,monospace;
+  font-size:13px;line-height:1.75;white-space:pre-wrap;word-break:break-word;
+  min-height:52px;color:var(--text);margin-top:12px;overflow-x:auto;
+}
+.out .k{color:var(--muted)}
+.out .v{color:var(--accent-2);font-weight:700}
+.out .e{color:var(--danger)}
+.out .w{color:var(--warn)}
+.out table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:4px}
+.out th,.out td{border:1px solid var(--line);padding:5px 9px;text-align:right;font-variant-numeric:tabular-nums}
+.out th{background:var(--key);color:var(--muted);font-weight:700;text-align:center}
+.out td:first-child,.out th:first-child{text-align:left;color:var(--muted)}
+
+.tool-card{
+  border:1px solid var(--line);border-radius:12px;padding:14px;
+  margin-bottom:12px;background:var(--panel-2);
+}
+.tool-card h3{
+  font-size:12px;margin:0 0 10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;
+}
+.hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+.footer{
+  text-align:center;font-size:11px;color:var(--muted);margin-top:26px;
+  line-height:1.6;letter-spacing:.03em;
+}
+.warnbar{
+  background:rgba(255,92,108,.12);border:1px solid var(--danger);
+  color:var(--danger);border-radius:10px;padding:11px 14px;font-size:12.5px;
+  margin-bottom:14px;line-height:1.5;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">ES<br>99</div>
+      <div>
+        <h1>ES-99 Advanced Scientific Calculator</h1>
+        <p>Computational Mathematics Engine</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="chip" id="angleBtn" title="Toggle degrees / radians">DEG</button>
+      <button class="chip" id="themeBtn" title="Toggle light / dark">☀ Light</button>
+    </div>
+  </header>
+
+  <nav class="modes" id="modeBar">
+    <button data-mode="COMP" class="active">COMP</button>
+    <button data-mode="CMPLX">CMPLX</button>
+    <button data-mode="STAT">STAT</button>
+    <button data-mode="BASEN">BASE-N</button>
+    <button data-mode="MATRIX">MATRIX</button>
+    <button data-mode="VECTOR">VECTOR</button>
+    <button data-mode="EQUATION">EQUATION</button>
+    <button data-mode="TABLE">TABLE</button>
+    <button data-mode="TOOLS">TOOLS</button>
+  </nav>
+
+  <div id="libWarn" class="warnbar" hidden>
+    ⚠ The math engine failed to load from the CDN. Connect to the internet and reload the page to enable full functionality.
+  </div>
+
+  <main>
+    <!-- ================= CALCULATOR VIEW ================= -->
+    <section class="card" id="viewCalc">
+      <div class="lcd">
+        <div class="lcd-hist" id="lcdHist">&nbsp;</div>
+        <div class="lcd-expr" id="lcdExpr"></div>
+        <div class="lcd-res" id="lcdRes">0</div>
+        <div class="lcd-alt" id="lcdAlt">&nbsp;</div>
+      </div>
+
+      <div class="indicators">
+        <span class="ind on" id="indAngle">DEG</span>
+        <span class="ind" id="indShift">SHIFT</span>
+        <span class="ind" id="indAlpha">ALPHA</span>
+        <span class="ind" id="indMem">M</span>
+        <span class="ind" id="indMode">COMP</span>
+        <span class="ind spacer"></span>
+        <button class="copy-btn" id="copyBtn">COPY</button>
+      </div>
+
+      <div class="keypad" id="keypad"></div>
+
+      <details class="more">
+        <summary>More functions &amp; memory</summary>
+        <div class="extras" id="extras"></div>
+        <div class="btn-row" style="margin-top:12px;align-items:center">
+          <span style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em">PRECISION</span>
+          <select id="precSel" style="width:auto;padding:6px 10px;font-size:12px">
+            <option value="6">6 digits</option>
+            <option value="8">8 digits</option>
+            <option value="10" selected>10 digits</option>
+            <option value="12">12 digits</option>
+            <option value="15">15 digits</option>
+          </select>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= STAT ================= -->
+    <section class="card mode-panel" id="panel-STAT" hidden>
+      <h2>STAT — Statistics &amp; Regression</h2>
+      <p class="desc">Enter values separated by commas, spaces or new lines. Add a second data set to compute linear regression.</p>
+      <div class="grid2">
+        <div class="fld">
+          <label>Data set X</label>
+          <textarea id="statX" placeholder="12, 15, 18, 22, 25, 28"></textarea>
+        </div>
+        <div class="fld">
+          <label>Data set Y (optional)</label>
+          <textarea id="statY" placeholder="3, 4, 6, 7, 9, 10"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" data-run="stat">Compute</button>
+        <button class="btn ghost" data-sample="stat">Load sample</button>
+      </div>
+      <div class="out" id="statOut">Awaiting data…</div>
+    </section>
+
+    <!-- ================= BASE-N ================= -->
+    <section class="card mode-panel" id="panel-BASEN" hidden>
+      <h2>BASE-N — Number Systems</h2>
+      <p class="desc">Convert between binary, octal, decimal and hexadecimal, and perform bitwise operations.</p>
+      <div class="grid3">
+        <div class="fld"><label>Value A</label><input type="text" id="bnA" value="255" /></div>
+        <div class="fld"><label>Value B (optional)</label><input type="text" id="bnB" value="15" /></div>
+        <div class="fld"><label>Input base</label>
+          <select id="bnBase">
+            <option value="10" selected>Decimal (10)</option>
+            <option value="2">Binary (2)</option>
+            <option value="8">Octal (8)</option>
+            <option value="16">Hexadecimal (16)</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <label>Operation</label>
+        <select id="bnOp">
+          <option value="none">Convert only</option>
+          <option value="and">A AND B</option>
+          <option value="or">A OR B</option>
+          <option value="xor">A XOR B</option>
+          <option value="not">NOT A</option>
+          <option value="lsh">A &lt;&lt; B</option>
+          <option value="rsh">A &gt;&gt; B</option>
+          <option value="add">A + B</option>
+          <option value="sub">A − B</option>
+          <option value="mul">A × B</option>
+        </select>
+      </div>
+      <div class="btn-row"><button class="btn" data-run="basen">Compute</button></div>
+      <div class="out" id="bnOut">Awaiting input…</div>
+    </section>
+
+    <!-- ================= MATRIX ================= -->
+    <section class="card mode-panel" id="panel-MATRIX" hidden>
+      <h2>MATRIX — Matrix Algebra</h2>
+      <p class="desc">Write matrices as <code>1 2; 3 4</code> (rows separated by <code>;</code>) or as <code>[[1,2],[3,4]]</code>.</p>
+      <div class="grid2">
+        <div class="fld"><label>Matrix A</label><textarea id="matA" placeholder="1 2; 3 4">1 2; 3 4</textarea></div>
+        <div class="fld"><label>Matrix B</label><textarea id="matB" placeholder="5 6; 7 8">5 6; 7 8</textarea></div>
+      </div>
+      <div class="fld">
+        <label>Operation</label>
+        <select id="matOp">
+          <option value="add">A + B</option>
+          <option value="sub">A − B</option>
+          <option value="mul">A × B</option>
+          <option value="det">det(A)</option>
+          <option value="inv">A⁻¹</option>
+          <option value="trans">Aᵀ</option>
+          <option value="rank">rank(A)</option>
+          <option value="trace">trace(A)</option>
+          <option value="pow">A²</option>
+          <option value="scale">k × A</option>
+        </select>
+      </div>
+      <div class="fld"><label>Scalar k (for k × A)</label><input type="number" id="matK" value="2" step="any" /></div>
+      <div class="btn-row"><button class="btn" data-run="matrix">Compute</button></div>
+      <div class="out" id="matOut">Awaiting input…</div>
+    </section>
+
+    <!-- ================= VECTOR ================= -->
+    <section class="card mode-panel" id="panel-VECTOR" hidden>
+      <h2>VECTOR — Vector Calculus</h2>
+      <p class="desc">Enter vectors as <code>1, 2, 3</code> or <code>[1,2,3]</code>. Cross product requires 3 components.</p>
+      <div class="grid2">
+        <div class="fld"><label>Vector A</label><input type="text" id="vecA" value="1, 2, 3" /></div>
+        <div class="fld"><label>Vector B</label><input type="text" id="vecB" value="4, 5, 6" /></div>
+      </div>
+      <div class="fld">
+        <label>Operation</label>
+        <select id="vecOp">
+          <option value="add">A + B</option>
+          <option value="sub">A − B</option>
+          <option value="dot">A · B (dot)</option>
+          <option value="cross">A × B (cross)</option>
+          <option value="mag">|A|</option>
+          <option value="unit">unit(A)</option>
+          <option value="angle">angle(A, B)</option>
+          <option value="scale">k × A</option>
+        </select>
+      </div>
+      <div class="fld"><label>Scalar k</label><input type="number" id="vecK" value="2" step="any" /></div>
+      <div class="btn-row"><button class="btn" data-run="vector">Compute</button></div>
+      <div class="out" id="vecOut">Awaiting input…</div>
+    </section>
+
+    <!-- ================= EQUATION ================= -->
+    <section class="card mode-panel" id="panel-EQUATION" hidden>
+      <h2>EQUATION — Equation Solver</h2>
+      <p class="desc">Solve linear, quadratic, cubic and simultaneous linear systems with step-by-step working.</p>
+      <div class="fld">
+        <label>Equation type</label>
+        <select id="eqType">
+          <option value="lin">Linear — ax + b = 0</option>
+          <option value="quad" selected>Quadratic — ax² + bx + c = 0</option>
+          <option value="cubic">Cubic — ax³ + bx² + cx + d = 0</option>
+          <option value="sys2">Simultaneous 2 × 2</option>
+          <option value="sys3">Simultaneous 3 × 3</option>
+        </select>
+      </div>
+      <div id="eqFields"></div>
+      <div class="btn-row"><button class="btn" data-run="equation">Solve</button></div>
+      <div class="out" id="eqOut">Awaiting input…</div>
+    </section>
+
+    <!-- ================= TABLE ================= -->
+    <section class="card mode-panel" id="panel-TABLE" hidden>
+      <h2>TABLE — Function Value Table</h2>
+      <p class="desc">Generate a table of values for f(x). Use <code>x</code> as the variable.</p>
+      <div class="fld"><label>f(x) =</label><input type="text" id="tblExpr" value="x^2 - 3x + 1" /></div>
+      <div class="grid3">
+        <div class="fld"><label>Start x</label><input type="number" id="tblStart" value="-3" step="any" /></div>
+        <div class="fld"><label>End x</label><input type="number" id="tblEnd" value="3" step="any" /></div>
+        <div class="fld"><label>Step</label><input type="number" id="tblStep" value="1" step="any" /></div>
+      </div>
+      <div class="btn-row"><button class="btn" data-run="table">Generate</button></div>
+      <div class="out" id="tblOut">Awaiting input…</div>
+    </section>
+
+    <!-- ================= TOOLS ================= -->
+    <section class="card mode-panel" id="panel-TOOLS" hidden>
+      <h2>TOOLS — Advanced Mathematics</h2>
+      <p class="desc">Calculus, limits, numerical methods and sequences. Angle mode applies throughout.</p>
+
+      <div class="tool-card">
+        <h3>Differentiation</h3>
+        <div class="grid2">
+          <div class="fld"><label>f(x)</label><input type="text" id="dExpr" value="x^3 - 2x" /></div>
+          <div class="fld"><label>Evaluate at x₀</label><input type="number" id="dAt" value="1.5" step="any" /></div>
+        </div>
+        <div class="btn-row"><button class="btn" data-run="deriv">Differentiate</button></div>
+        <div class="out" id="dOut">Awaiting input…</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Definite Integration (Simpson's rule)</h3>
+        <div class="grid3">
+          <div class="fld"><label>f(x)</label><input type="text" id="iExpr" value="sin(x)" /></div>
+          <div class="fld"><label>Lower a</label><input type="number" id="iA" value="0" step="any" /></div>
+          <div class="fld"><label>Upper b</label><input type="number" id="iB" value="3.14159265" step="any" /></div>
+        </div>
+        <div class="btn-row"><button class="btn" data-run="integral">Integrate</button></div>
+        <div class="out" id="iOut">Awaiting input…</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Numerical Limit</h3>
+        <div class="grid2">
+          <div class="fld"><label>f(x)</label><input type="text" id="lExpr" value="sin(x)/x" /></div>
+          <div class="fld"><label>x → a</label><input type="number" id="lAt" value="0" step="any" /></div>
+        </div>
+        <div class="btn-row"><button class="btn" data-run="limit">Evaluate limit</button></div>
+        <div class="out" id="lOut">Awaiting input…</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Root Finding (bisection)</h3>
+        <div class="grid3">
+          <div class="fld"><label>f(x)</label><input type="text" id="rExpr" value="x^3 - x - 2" /></div>
+          <div class="fld"><label>a</label><input type="number" id="rA" value="1" step="any" /></div>
+          <div class="fld"><label>b</label><input type="number" id="rB" value="2" step="any" /></div>
+        </div>
+        <div class="btn-row"><button class="btn" data-run="root">Find root</button></div>
+        <div class="out" id="rOut">Awaiting input…</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Sequ
